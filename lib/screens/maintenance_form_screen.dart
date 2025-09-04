@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:maintenance_note/models/maintenance_record.dart';
 import 'package:maintenance_note/services/maintenance_service.dart';
+import 'package:maintenance_note/services/image_storage_service.dart';
 
 class MaintenanceFormScreen extends StatefulWidget {
   final VehicleType vehicleType;
@@ -77,6 +78,21 @@ class _MaintenanceFormScreenState extends State<MaintenanceFormScreen> {
   Future<void> _saveMaintenanceRecord() async {
     if (_formKey.currentState!.validate()) {
       try {
+        // 로딩 다이얼로그 표시
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+
+        // 사진들을 앱 전용 폴더에 저장
+        List<String> savedImagePaths = [];
+        if (_selectedImages.isNotEmpty) {
+          savedImagePaths = await ImageStorageService.saveImagesToAppDirectory(_selectedImages);
+        }
+
         final record = MaintenanceRecord(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           maintenanceDate: _selectedDate,
@@ -84,23 +100,27 @@ class _MaintenanceFormScreenState extends State<MaintenanceFormScreen> {
           cost: double.parse(_costController.text),
           futureMaintenance: _futureMaintenanceController.text,
           currentMileage: int.parse(_mileageController.text),
-          imagePaths: _selectedImages.map((image) => image.path).toList(),
+          imagePaths: savedImagePaths,
           vehicleType: widget.vehicleType,
         );
 
         await _maintenanceService.saveMaintenanceRecord(record);
 
+        // 로딩 다이얼로그 닫기
         if (mounted) {
+          Navigator.pop(context); // 로딩 다이얼로그 닫기
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('정비 일지가 저장되었습니다!'),
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.pop(context);
+          Navigator.pop(context); // 입력 화면 닫기
         }
       } catch (e) {
+        // 로딩 다이얼로그 닫기
         if (mounted) {
+          Navigator.pop(context); // 로딩 다이얼로그 닫기
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('저장 중 오류가 발생했습니다: $e'),
